@@ -43,6 +43,19 @@ if ('serviceWorker' in navigator) {
             border-right: 10px solid white;
             box-sizing: border-box;
             overflow: hidden;
+            perspective: 400px;
+        }
+
+        #road-text {
+            position: absolute;
+            top: 20%;
+            left: 50%;
+            transform: translateX(-50%) rotateX(60deg);
+            color: rgba(255, 255, 255, 0.3);
+            font-size: 5vw;
+            font-weight: bold;
+            letter-spacing: 10px;
+            z-index: 0;
         }
 
         #stop-line {
@@ -105,30 +118,6 @@ if ('serviceWorker' in navigator) {
             color: #ff4444;
         }
 
-        #raise-hand-btn {
-            position: absolute;
-            bottom: 20px;
-            width: 120px;
-            height: 120px;
-            border-radius: 50%;
-            background-color: #ff4444;
-            border: 4px solid white;
-            color: white;
-            font-size: 24px;
-            font-weight: bold;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            cursor: pointer;
-            z-index: 10;
-            box-shadow: 0 4px 0 #b30000;
-        }
-
-        #raise-hand-btn:active {
-            transform: translateY(4px);
-            box-shadow: none;
-        }
-
         #pop-up-char {
             position: absolute;
             bottom: 25%;
@@ -175,6 +164,7 @@ if ('serviceWorker' in navigator) {
     </div>
 
     <div id="road">
+        <div id="road-text">あうとばーん</div>
         <div id="stop-line"></div>
         
         <div id="pop-up-char">
@@ -189,8 +179,6 @@ if ('serviceWorker' in navigator) {
     </div>
 
     <div id="message"></div>
-
-    <button id="raise-hand-btn">挙手</button>
 </div>
 
 <script>
@@ -198,27 +186,19 @@ if ('serviceWorker' in navigator) {
     const taxi = document.getElementById('taxi');
     const road = document.getElementById('road');
     const stopLine = document.getElementById('stop-line');
-    const btn = document.getElementById('raise-hand-btn');
     const scoreDisplay = document.getElementById('social-credit');
     const popUpChar = document.getElementById('pop-up-char');
     const messageEl = document.getElementById('message');
 
     let score = 0;
-    let speedBase = 0.5; // 初速（% of height per frame）
     let positionY = -20; // タクシーの初期位置 (%)
     let isMoving = true;
     let animationId;
+    let currentSpeed = 0; // タクシーの現在の速度
 
     // ゲームループ
     function gameLoop() {
         if (!isMoving) return;
-
-        // 速度計算 (指数関数的に早くなる)
-        // 1.15 の score乗
-        let currentSpeed = speedBase * Math.pow(1.15, score);
-        
-        // 最大速度制限（速すぎると見えないため）
-        if (currentSpeed > 8) currentSpeed = 8;
 
         positionY += currentSpeed;
 
@@ -236,6 +216,10 @@ if ('serviceWorker' in navigator) {
         positionY = -20;
         taxi.style.top = positionY + '%';
         hideCharacter();
+
+        // 速度をランダムに設定 (0.5 ~ 1.5 %/frame の範囲)
+        currentSpeed = Math.random() + 0.5;
+
         // 動き再開
         isMoving = true;
         cancelAnimationFrame(animationId);
@@ -328,15 +312,16 @@ if ('serviceWorker' in navigator) {
     }
 
     // イベントリスナー
-    btn.addEventListener('touchstart', (e) => {
+    const gameContainer = document.getElementById('game-container');
+    gameContainer.addEventListener('touchstart', (e) => {
         e.preventDefault(); // デフォルトのズームなどを防止
         checkTiming();
     }, { passive: false }); // passive: falseを追加してpreventDefaultを有効にする
     
-    btn.addEventListener('mousedown', checkTiming);
+    gameContainer.addEventListener('mousedown', checkTiming);
 
     // スタート
-    animationId = requestAnimationFrame(gameLoop);
+    resetTaxi();
 
 </script>
 </body>
