@@ -1,6 +1,6 @@
 {
-    "name": "PWA sample program",
-    "short_name": "PWA sample",
+    "name": "ローマ式タクシー",
+    "short_name": "ローマ式タクシー",
     "start_url": "index.html",
     "display": "standalone",
     "icons": [
