@@ -105,7 +105,7 @@ if ('serviceWorker' in navigator) {
             position: absolute;
             top: 10px;
             left: 10px;
-            color: white;
+            color: red;
             font-size: 18px;
             background: rgba(0,0,0,0.5);
             padding: 10px;
@@ -160,7 +160,7 @@ if ('serviceWorker' in navigator) {
 
 <div id="game-container">
     <div id="score-board">
-        🇨🇳ソーシャルクレジット: <span id="social-credit">0</span>
+        🇨🇳社會信用體系(SocialCredit): <span id="social-credit">0</span>
     </div>
 
     <div id="road">
@@ -217,8 +217,8 @@ if ('serviceWorker' in navigator) {
         taxi.style.top = positionY + '%';
         hideCharacter();
 
-        // 速度をランダムに設定 (0.5 ~ 1.5 %/frame の範囲)
-        currentSpeed = Math.random() + 0.5;
+        // 速度をランダムに設定 (1.0 ~ 2.0 %/frame の範囲に修正)
+        currentSpeed = Math.random() + 1.0; 
 
         // 動き再開
         isMoving = true;
@@ -247,12 +247,6 @@ if ('serviceWorker' in navigator) {
         // 許容範囲 (px) - これを狭くすると難しくなる
         const tolerance = 10; 
 
-        // 成功条件: タクシーの底部が停止線の底部より上で、かつ停止線の底部に十分近い
-        // または、停止線がタクシーの範囲内にほぼ完全に収まっている場合など
-        
-        // 修正された成功条件: タクシーの中心が黄色い線の範囲内に収まっている
-        // ここでは「タクシーの底部」が「停止線」に「重なっている」条件を厳しくする
-        
         // 成功条件: タクシーが停止線に重なっている
         if (taxiBottom > lineTop && taxiTop < lineBottom) {
             success();
