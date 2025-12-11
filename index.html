@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ローマ式タクシー</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #333;
+            font-family: 'Arial', sans-serif;
+            touch-action: manipulation;
+            user-select: none;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            background: linear-gradient(to bottom, #87CEEB 0%, #e0e0e0 40%, #555 40%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        #road {
+            position: absolute;
+            top: 40%;
+            bottom: 0;
+            width: 80%;
+            background-color: #555;
+            border-left: 10px solid white;
+            border-right: 10px solid white;
+            box-sizing: border-box;
+        }
+
+        #stop-line {
+            position: absolute;
+            bottom: 25%;
+            width: 100%;
+            height: 10px;
+            background-color: yellow;
+            z-index: 1;
+        }
+
+        #taxi {
+            position: absolute;
+            width: 120px;
+            height: 70px;
+            background-color: #FFD700;
+            border-radius: 10px;
+            top: -100px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            z-index: 2;
+        }
+
+        #taxi-text {
+            font-size: 10px;
+            writing-mode: vertical-rl;
+            color: black;
+            font-weight: bold;
+            position: absolute;
+            right: 5px;
+        }
+        
+        #taxi-roof {
+            position: absolute;
+            top: -10px;
+            width: 40px;
+            height: 10px;
+            background-color: white;
+            border-radius: 3px 3px 0 0;
+        }
+
+        #score-board {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            font-size: 18px;
+            background: rgba(0,0,0,0.5);
+            padding: 10px;
+            border-radius: 5px;
+            z-index: 10;
+        }
+
+        #social-credit {
+            font-weight: bold;
+            color: #ff4444;
+        }
+
+        #raise-hand-btn {
+            position: absolute;
+            bottom: 20px;
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background-color: #ff4444;
+            border: 4px solid white;
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            z-index: 10;
+            box-shadow: 0 4px 0 #b30000;
+        }
+
+        #raise-hand-btn:active {
+            transform: translateY(4px);
+            box-shadow: none;
+        }
+
+        #pop-up-char {
+            position: absolute;
+            bottom: 25%;
+            right: -150px;
+            width: 200px;
+            height: 200px;
+            text-align: center;
+            line-height: 100px;
+            transition: right 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
+            z-index: 5;
+            background-image: url('main.png');
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+        }
+
+        #pop-up-char img {
+            max-width: 100%;
+            max-height: 100%;
+
+        }
+
+        #message {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: red;
+            font-size: 32px;
+            font-weight: bold;
+            text-shadow: 2px 2px white;
+            display: none;
+            z-index: 20;
+            text-align: center;
+        }
+
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <div id="score-board">
+        🇨🇳ソーシャルクレジット: <span id="social-credit">0</span>
+    </div>
+
+    <div id="road">
+        <div id="stop-line"></div>
+        
+        <div id="pop-up-char">
+            <img src="main.png" alt="おじいちゃん">
+        </div>
+        
+        <div id="taxi">
+            <div id="taxi-roof"></div>
+            <span id="taxi-text">ふぉるくすわーげん</span>
+            🚘
+        </div>
+    </div>
+
+    <div id="message"></div>
+
+    <button id="raise-hand-btn">挙手</button>
+</div>
+
+<script>
+    // ゲーム設定
+    const taxi = document.getElementById('taxi');
+    const road = document.getElementById('road');
+    const stopLine = document.getElementById('stop-line');
+    const btn = document.getElementById('raise-hand-btn');
+    const scoreDisplay = document.getElementById('social-credit');
+    const popUpChar = document.getElementById('pop-up-char');
+    const messageEl = document.getElementById('message');
+
+    let score = 0;
+    let speedBase = 0.5; // 初速（% of height per frame）
+    let positionY = -20; // タクシーの初期位置 (%)
+    let isMoving = true;
+    let animationId;
+
+    // ゲームループ
+    function gameLoop() {
+        if (!isMoving) return;
+
+        // 速度計算 (指数関数的に早くなる)
+        // 1.15 の score乗
+        let currentSpeed = speedBase * Math.pow(1.15, score);
+        
+        // 最大速度制限（速すぎると見えないため）
+        if (currentSpeed > 8) currentSpeed = 8;
+
+        positionY += currentSpeed;
+
+        if (positionY > 120) {
+            // 通り過ぎた場合（失敗）
+            resetTaxi();
+        } else {
+            taxi.style.top = positionY + '%';
+            animationId = requestAnimationFrame(gameLoop);
+        }
+    }
+
+    // タクシーのリセット
+    function resetTaxi() {
+        positionY = -20;
+        taxi.style.top = positionY + '%';
+        hideCharacter();
+        // 動き再開
+        isMoving = true;
+        cancelAnimationFrame(animationId);
+        animationId = requestAnimationFrame(gameLoop);
+    }
+
+    // 挙手ボタンの処理
+    function checkTiming() {
+        if (!isMoving) {
+            // 停止中なら何もしない
+            return;
+        }
+
+        // 厳密なピクセル計算
+        const taxiRect = taxi.getBoundingClientRect();
+        const lineRect = stopLine.getBoundingClientRect();
+        const roadRect = road.getBoundingClientRect();
+
+        // 判定基準
+        const taxiTop = taxiRect.top;
+        const taxiBottom = taxiRect.bottom;
+        const lineTop = lineRect.top;
+        const lineBottom = lineRect.bottom;
+
+        // 許容範囲 (px) - これを狭くすると難しくなる
+        const tolerance = 10; 
+
+        // 成功条件: タクシーの底部が停止線の底部より上で、かつ停止線の底部に十分近い
+        // または、停止線がタクシーの範囲内にほぼ完全に収まっている場合など
+        
+        // 修正された成功条件: タクシーの中心が黄色い線の範囲内に収まっている
+        // ここでは「タクシーの底部」が「停止線」に「重なっている」条件を厳しくする
+        
+        // タクシーの底が線の底より上にある
+        const isTaxiAboveLineBottom = taxiBottom < lineBottom + tolerance;
+        // タクシーの底が線のトップとほぼ一致している (または線に重なっている)
+        const isTaxiOverlappingLine = taxiBottom > lineTop - tolerance;
+
+        // 成功！：タクシーの底部が停止線の真上に非常に近い範囲にある
+        if (isTaxiOverlappingLine && isTaxiAboveLineBottom) {
+            success();
+        } else {
+            // 失敗...
+            fail();
+        }
+    }
+
+    function success() {
+        isMoving = false;
+        cancelAnimationFrame(animationId);
+        
+        score++;
+        scoreDisplay.textContent = score;
+
+        messageEl.textContent = "好機!!";
+        messageEl.style.display = 'block';
+
+        showCharacter();
+
+        setTimeout(() => {
+             messageEl.style.display = 'none'; // メッセージを消す
+             resetTaxi();
+        }, 500);
+    }
+
+    function fail() {
+        messageEl.textContent = "失敗";
+        messageEl.style.color = 'white';
+        messageEl.style.textShadow = '2px 2px black';
+        messageEl.style.display = 'block';
+
+        taxi.style.backgroundColor = 'red';
+        
+        setTimeout(() => {
+            messageEl.style.display = 'none';
+            messageEl.style.color = 'red';
+            messageEl.style.textShadow = '2px 2px white';
+            taxi.style.backgroundColor = '#FFD700';
+
+            resetTaxi();
+        }, 300); // 失敗メッセージは少し短く表示
+    }
+
+    function showCharacter() {
+
+        popUpChar.style.right = '0px';
+    }
+
+    function hideCharacter() {
+
+        popUpChar.style.right = '-150px';
+    }
+
+    // イベントリスナー
+    btn.addEventListener('touchstart', (e) => {
+        e.preventDefault(); // デフォルトのズームなどを防止
+        checkTiming();
+    }, { passive: false }); // passive: falseを追加してpreventDefaultを有効にする
+    
+    btn.addEventListener('mousedown', checkTiming);
+
+    // スタート
+    animationId = requestAnimationFrame(gameLoop);
+
+</script>
+</body>
+</html>
