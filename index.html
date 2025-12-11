@@ -26,11 +26,13 @@ if ('serviceWorker' in navigator) {
             position: relative;
             width: 100vw;
             height: 100vh;
+            cursor: pointer;
             background: linear-gradient(to bottom, #87CEEB 0%, #e0e0e0 40%, #555 40%);
             display: flex;
             flex-direction: column;
             align-items: center;
             overflow: hidden;
+            -webkit-tap-highlight-color: transparent;
         }
 
         #road {
@@ -38,11 +40,35 @@ if ('serviceWorker' in navigator) {
             top: 40%;
             bottom: 0;
             width: 80%;
-            background-color: #555;
-            border-left: 10px solid white;
-            border-right: 10px solid white;
+            background-color: white; 
             box-sizing: border-box;
-            overflow: hidden;
+            clip-path: polygon(25% 0, 75% 0, 100% 100%, 0% 100%);
+            pointer-events: none; 
+            z-index: 1;
+        }
+
+        #road-surface {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #555;
+            clip-path: polygon(27% 0, 73% 0, 97% 100%, 3% 100%);
+            z-index: 0;
+        }
+
+        #road-text {
+            position: absolute;
+            top: 30%;
+            width: 100%;
+            text-align: center;
+            font-size: 50px;
+            font-weight: bold;
+            color: rgba(255, 255, 255, 0.5);
+            transform: scaleY(4);
+            pointer-events: none;
+            z-index: 0;
         }
 
         #stop-line {
@@ -92,12 +118,13 @@ if ('serviceWorker' in navigator) {
             position: absolute;
             top: 10px;
             left: 10px;
-            color: white;
+            color: red;
             font-size: 18px;
             background: rgba(0,0,0,0.5);
             padding: 10px;
             border-radius: 5px;
-            z-index: 10;
+            z-index: 20;
+            pointer-events: none;
         }
 
         #social-credit {
@@ -105,50 +132,31 @@ if ('serviceWorker' in navigator) {
             color: #ff4444;
         }
 
-        #raise-hand-btn {
-            position: absolute;
-            bottom: 20px;
-            width: 120px;
-            height: 120px;
-            border-radius: 50%;
-            background-color: #ff4444;
-            border: 4px solid white;
-            color: white;
-            font-size: 24px;
-            font-weight: bold;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            cursor: pointer;
-            z-index: 10;
-            box-shadow: 0 4px 0 #b30000;
-        }
-
-        #raise-hand-btn:active {
-            transform: translateY(4px);
-            box-shadow: none;
-        }
 
         #pop-up-char {
             position: absolute;
-            bottom: 25%;
-            right: -200px;
-            width: 200px;
-            height: 200px;
-            text-align: center;
-            line-height: 100px;
-            transition: right 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
-            z-index: 5;
-            background-image: url('main.png');
-            background-size: contain;
-            background-repeat: no-repeat;
-            background-position: center;
+            bottom: 20%;
+            right: 0;
+            width: 35vw;
+            max-width: 200px;
+            height: auto;
+            
+
+            transform: translateX(120%); 
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            
+            z-index: 10; /* Roadより手前に表示 */
+            pointer-events: none;
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
         }
 
         #pop-up-char img {
-            max-width: 100%;
-            max-height: 100%;
-
+            width: 100%;
+            height: auto;
+            object-fit: contain;
+            filter: drop-shadow(2px 4px 6px black);
         }
 
         #message {
@@ -161,8 +169,10 @@ if ('serviceWorker' in navigator) {
             font-weight: bold;
             text-shadow: 2px 2px white;
             display: none;
-            z-index: 20;
+            z-index: 30;
             text-align: center;
+            pointer-events: none;
+            width: 100%;
         }
 
     </style>
@@ -175,11 +185,11 @@ if ('serviceWorker' in navigator) {
     </div>
 
     <div id="road">
-        <div id="stop-line"></div>
-        
-        <div id="pop-up-char">
-            <img src="main.png" alt="おじいちゃん">
+        <div id="road-surface">
+            <div id="road-text">あうとばーん</div>
         </div>
+
+        <div id="stop-line"></div>
         
         <div id="taxi">
             <div id="taxi-roof"></div>
@@ -188,45 +198,50 @@ if ('serviceWorker' in navigator) {
         </div>
     </div>
 
-    <div id="message"></div>
+    <div id="pop-up-char">
+        <img src="main.png" alt="おじいちゃん">
+    </div>
 
-    <button id="raise-hand-btn">挙手</button>
+    <div id="message"></div>
 </div>
 
 <script>
     // ゲーム設定
+    const gameContainer = document.getElementById('game-container');
     const taxi = document.getElementById('taxi');
     const road = document.getElementById('road');
     const stopLine = document.getElementById('stop-line');
-    const btn = document.getElementById('raise-hand-btn');
     const scoreDisplay = document.getElementById('social-credit');
     const popUpChar = document.getElementById('pop-up-char');
     const messageEl = document.getElementById('message');
 
     let score = 0;
-    let speedBase = 0.5; // 初速（% of height per frame）
-    let positionY = -20; // タクシーの初期位置 (%)
+    let speedBase = 0.5;
+    let positionY = -20;
     let isMoving = true;
     let animationId;
+    let taxiSpeed;
 
     // ゲームループ
     function gameLoop() {
         if (!isMoving) return;
 
-        // 速度計算 (指数関数的に早くなる)
-        // 1.15 の score乗
-        let currentSpeed = speedBase * Math.pow(1.15, score);
-        
-        // 最大速度制限（速すぎると見えないため）
-        if (currentSpeed > 8) currentSpeed = 8;
-
-        positionY += currentSpeed;
+        positionY += taxiSpeed;
 
         if (positionY > 120) {
-            // 通り過ぎた場合（失敗）
             resetTaxi();
         } else {
+            const minY = -20;
+            const maxY = 100;
+            const minScale = 0.2;
+            const maxScale = 1.2;
+            
+            let scale = minScale + (maxScale - minScale) * (positionY - minY) / (maxY - minY);
+            if (scale < minScale) scale = minScale;
+            if (scale > maxScale) scale = maxScale;
+            
             taxi.style.top = positionY + '%';
+            taxi.style.transform = `translateX(-50%) scale(${scale})`;
             animationId = requestAnimationFrame(gameLoop);
         }
     }
@@ -235,45 +250,32 @@ if ('serviceWorker' in navigator) {
     function resetTaxi() {
         positionY = -20;
         taxi.style.top = positionY + '%';
+        taxi.style.transform = `translateX(-50%) scale(0.2)`;
         hideCharacter();
-        // 動き再開
+        taxiSpeed = Math.random() * 3 + 1; 
         isMoving = true;
         cancelAnimationFrame(animationId);
         animationId = requestAnimationFrame(gameLoop);
     }
 
-    // 挙手ボタンの処理
-    function checkTiming() {
+    // 挙手アクションの処理
+    function checkTiming(e) {
         if (!isMoving) {
-            // 停止中なら何もしない
             return;
         }
 
-        // 厳密なピクセル計算
         const taxiRect = taxi.getBoundingClientRect();
         const lineRect = stopLine.getBoundingClientRect();
-        const roadRect = road.getBoundingClientRect();
 
-        // 判定基準
         const taxiTop = taxiRect.top;
         const taxiBottom = taxiRect.bottom;
         const lineTop = lineRect.top;
         const lineBottom = lineRect.bottom;
 
-        // 許容範囲 (px) - これを狭くすると難しくなる
-        const tolerance = 10; 
 
-        // 成功条件: タクシーの底部が停止線の底部より上で、かつ停止線の底部に十分近い
-        // または、停止線がタクシーの範囲内にほぼ完全に収まっている場合など
-        
-        // 修正された成功条件: タクシーの中心が黄色い線の範囲内に収まっている
-        // ここでは「タクシーの底部」が「停止線」に「重なっている」条件を厳しくする
-        
-        // 成功条件: タクシーが停止線に重なっている
         if (taxiBottom > lineTop && taxiTop < lineBottom) {
             success();
         } else {
-            // 失敗...
             fail();
         }
     }
@@ -287,13 +289,15 @@ if ('serviceWorker' in navigator) {
 
         messageEl.textContent = "好機!!";
         messageEl.style.display = 'block';
+        messageEl.style.color = 'red';
+        messageEl.style.textShadow = '2px 2px white';
 
         showCharacter();
 
         setTimeout(() => {
-             messageEl.style.display = 'none'; // メッセージを消す
+             messageEl.style.display = 'none';
              resetTaxi();
-        }, 500);
+        }, 1000); // キャラクターを少し長く見せるために時間を500msから1000msに延長
     }
 
     function fail() {
@@ -314,29 +318,30 @@ if ('serviceWorker' in navigator) {
             taxi.style.backgroundColor = '#FFD700';
 
             resetTaxi();
-        }, 300); // 失敗メッセージは少し短く表示
+        }, 300);
     }
 
     function showCharacter() {
 
-        popUpChar.style.right = '0px';
+        popUpChar.style.transform = 'translateX(-10%)';
     }
 
     function hideCharacter() {
-
-        popUpChar.style.right = '-200px';
+        popUpChar.style.transform = 'translateX(120%)';
     }
 
     // イベントリスナー
-    btn.addEventListener('touchstart', (e) => {
-        e.preventDefault(); // デフォルトのズームなどを防止
-        checkTiming();
-    }, { passive: false }); // passive: falseを追加してpreventDefaultを有効にする
+    gameContainer.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        checkTiming(e);
+    }, { passive: false });
     
-    btn.addEventListener('mousedown', checkTiming);
+    gameContainer.addEventListener('mousedown', (e) => {
+        checkTiming(e);
+    });
 
     // スタート
-    animationId = requestAnimationFrame(gameLoop);
+    resetTaxi();
 
 </script>
 </body>
