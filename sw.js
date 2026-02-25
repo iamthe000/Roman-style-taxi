@@ -1,7 +1,9 @@
 var CACHE_NAME = 'roman-style-taxi';
 var urlsToCache = [
     '',
-    'index.html'
+    'index.html',
+    'src/style.css',
+    'src/script.js'
 ];
 
 self.addEventListener('install', function(event) {
